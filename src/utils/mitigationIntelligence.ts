@@ -1,44 +1,42 @@
-// Types for Afforestation
-export type SoilType = "Coastal" | "Clay" | "Sandy" | "Red";
-export type WaterAvail = "Low" | "Medium" | "High";
-export type TreeType = "Neem" | "Banyan" | "Mangroves";
+import { treeSpecies } from "@/data/treeSpecies";
 
-export function calculateAfforestation(trees: number, treeType: TreeType, soil: SoilType, water: WaterAvail) {
+// Types for Afforestation
+export type AreaType = "coastal" | "urban" | "industrial" | "rural" | "dry" | "wetland";
+export type WaterAvail = "Low" | "Medium" | "High";
+
+export function calculateAfforestation(nodes: number, selectedSpecies: string, areaType: AreaType, water: WaterAvail) {
+  const species = treeSpecies.find(s => s.name === selectedSpecies) || treeSpecies[0];
   let multiplier = 1.0;
   let limitation = "";
   let recommendation = "";
 
-  if (treeType === "Mangroves") {
-    if (soil !== "Coastal") {
-      multiplier *= 0.1;
-      limitation = "Mangroves cannot survive in non-coastal soil types.";
-      recommendation = "Switch to Neem or Banyan for inland areas.";
-    } else {
-      multiplier *= 1.6;
-      limitation = "Restricted strictly to coastal zones.";
-      recommendation = "Optimal. Coastal mangroves provide superior carbon sink capabilities.";
-    }
-  } else if (treeType === "Banyan") {
-    if (water === "Low") {
-      multiplier *= 0.4;
-      limitation = "High water requirements not met. Stunted growth.";
-      recommendation = "Switch to Neem for drought resistance.";
-    } else {
-      multiplier *= 1.4;
-      limitation = "Requires significant urban space.";
-      recommendation = "Excellent canopy coverage and CO₂ absorption.";
-    }
+  const isSuitable = species.suitableFor.includes(areaType);
+  
+  if (!isSuitable) {
+    multiplier *= 0.2;
+    limitation = `⚠️ ${species.name} is not suitable for ${areaType} conditions. Growth risk: HIGH.`;
+    recommendation = `Recommended: Use species native to ${areaType} ecosystems.`;
   } else {
-    // Neem
-    multiplier *= 1.1;
-    limitation = "Slower total carbon absorption compared to large canopy trees.";
-    recommendation = "Highly resilient. Good for general urban planting anywhere.";
+    multiplier *= species.suitabilityScore;
+    recommendation = `✅ Optimal choice. ${species.name} sequester ${species.co2Absorption}kg CO₂/year in this ecosystem.`;
   }
 
-  const effectiveTrees = trees * multiplier;
+  // Water Sync
+  if (species.waterNeed === "high" && water === "Low") {
+    multiplier *= 0.5;
+    limitation += " Insufficient water availability for this species.";
+  }
+
+  const effectiveTrees = nodes * multiplier;
   const score = getScoreLetter(multiplier);
 
-  return { effectiveTrees, score, limitation, recommendation };
+  return { 
+    effectiveTrees, 
+    score, 
+    limitation, 
+    recommendation,
+    bestMatch: isSuitable && multiplier > 1.0
+  };
 }
 
 // Types for EV Transition

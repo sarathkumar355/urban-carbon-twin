@@ -8,11 +8,12 @@ import {
   calculateEvTransition,
   calculateTransitFlow,
   calculateDAC,
-  TreeType
+  AreaType
 } from "@/utils/mitigationIntelligence";
-import { Leaf, Car, Navigation, Factory, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { treeSpecies } from "@/data/treeSpecies";
+import { Leaf, Car, Navigation, Factory, AlertTriangle, CheckCircle2, Star } from "lucide-react";
 
-function InsightCard({ score, recommendation, limitation }: { score: string, recommendation: string, limitation: string }) {
+function InsightCard({ score, recommendation, limitation, bestMatch }: { score: string, recommendation: string, limitation: string, bestMatch?: boolean }) {
   const getScoreColor = () => {
     if (score.includes("A")) return "text-healthy border-healthy";
     if (score.includes("B") || score.includes("C")) return "text-blue-400 border-blue-400";
@@ -21,20 +22,30 @@ function InsightCard({ score, recommendation, limitation }: { score: string, rec
   };
 
   return (
-    <div className="mt-3 bg-black/40 border border-white/5 rounded-xl p-4 flex gap-4">
-      <div className={`flex shrink-0 items-center justify-center font-black text-2xl w-12 h-12 rounded-lg border-2 ${getScoreColor()}`}>
-        {score}
-      </div>
-      <div className="space-y-2 flex-1">
-        <div className="flex items-start gap-2">
-          <CheckCircle2 className="w-3.5 h-3.5 text-healthy mt-0.5 shrink-0" />
-          <p className="text-[10px] uppercase font-bold text-foreground/80 leading-snug">{recommendation}</p>
+    <div className="mt-3 bg-black/40 border border-white/5 rounded-xl p-4">
+      <div className="flex gap-4">
+        <div className={`flex shrink-0 items-center justify-center font-black text-2xl w-12 h-12 rounded-lg border-2 ${getScoreColor()}`}>
+          {score}
         </div>
-        <div className="flex items-start gap-2 pt-1 border-t border-white/10">
-          <AlertTriangle className="w-3.5 h-3.5 text-damage mt-0.5 shrink-0" />
-          <p className="text-[10px] uppercase font-bold text-damage/80 leading-snug">{limitation}</p>
+        <div className="space-y-2 flex-1">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-healthy mt-0.5 shrink-0" />
+            <p className="text-[10px] uppercase font-bold text-foreground/80 leading-snug">{recommendation}</p>
+          </div>
+          {limitation && (
+            <div className="flex items-start gap-2 pt-1 border-t border-white/10">
+              <AlertTriangle className="w-3.5 h-3.5 text-damage mt-0.5 shrink-0" />
+              <p className="text-[10px] uppercase font-bold text-damage/80 leading-snug">{limitation}</p>
+            </div>
+          )}
         </div>
       </div>
+      {bestMatch && (
+        <div className="mt-3 flex items-center gap-2 bg-healthy/10 border border-healthy/20 px-3 py-1.5 rounded-lg">
+          <Star className="w-3 h-3 text-healthy fill-healthy" />
+          <span className="text-[9px] font-black uppercase text-healthy tracking-widest">Scientific Best Match Awarded</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -55,7 +66,7 @@ function SelectDropdown({ label, value, options, onChange }: { label: string, va
       <select 
         value={value} 
         onChange={e => onChange(e.target.value)}
-        className="w-full bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold px-2 py-1.5 outline-none focus:border-healthy/50 text-healthy placeholder-white"
+        className="w-full bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold px-2 py-1.5 outline-none focus:border-healthy/50 text-healthy"
       >
         {options.map(o => <option key={o} value={o} className="bg-neutral-900 text-white">{o}</option>)}
       </select>
@@ -96,17 +107,20 @@ export function IntelligentMitigationPanel() {
 
   const [activeTab, setActiveTab] = useState(0);
 
-  // Raw local slider states
+  // States
   const [rawTrees, setRawTrees] = useState(55);
-  const [treeType, setTreeType] = useState<TreeType>("Neem");
+  const [areaType, setAreaType] = useState<AreaType>("urban");
+  const [selectedTree, setSelectedTree] = useState("Neem");
   
   const [rawEv, setRawEv] = useState(40);
   const [rawTraffic, setRawTraffic] = useState(30);
   const [rawDac, setRawDac] = useState(20);
 
-  // Dynamic Intelligence Lookups against region constants
-  // "treeType" remains selectable so the AI can grade if the user picks the wrong tree for the region!
-  const afforestIntel = calculateAfforestation(rawTrees, treeType, selectedRegion.soilType, selectedRegion.waterAvail);
+  // Filter available trees based on area type
+  const availableTrees = treeSpecies.filter(s => s.suitableFor.includes(areaType)).map(s => s.name);
+  const allTrees = treeSpecies.map(s => s.name);
+
+  const afforestIntel = calculateAfforestation(rawTrees, selectedTree, areaType, selectedRegion.waterAvail);
   const evIntel = calculateEvTransition(rawEv, selectedRegion.chargingDensity, selectedRegion.gridCapacity);
   const transitIntel = calculateTransitFlow(rawTraffic, selectedRegion.congestionZone, selectedRegion.transitCoverage);
   const dacIntel = calculateDAC(rawDac, selectedRegion.dacBudget, selectedRegion.energySource);
@@ -144,17 +158,39 @@ export function IntelligentMitigationPanel() {
         })}
       </div>
 
-      <div className="bg-black/20 rounded-2xl p-4 border border-white/5 min-h-[300px]">
+      <div className="bg-black/20 rounded-2xl p-4 border border-white/5 min-h-[350px]">
         <AnimatePresence mode="wait">
           
           {activeTab === 0 && (
             <motion.div key="aff" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-4">
               <Slider label="Tree Deployment Volume" value={rawTrees} onChange={setRawTrees} suffix="k units" />
+              
               <div className="flex flex-wrap gap-2">
-                <SelectDropdown label="Simulate Species" value={treeType} options={["Neem", "Banyan", "Mangroves"]} onChange={setTreeType} />
-                <RegionBadge label="Region Soil" value={selectedRegion.soilType} />
-                <RegionBadge label="Water Tracking" value={selectedRegion.waterAvail} />
+                <SelectDropdown 
+                  label="Area Classification" 
+                  value={areaType} 
+                  options={["urban", "coastal", "industrial", "rural", "dry", "wetland"]} 
+                  onChange={setAreaType} 
+                />
+                <SelectDropdown 
+                  label="Select Species" 
+                  value={selectedTree} 
+                  options={allTrees} 
+                  onChange={setSelectedTree} 
+                />
               </div>
+
+              <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                <p className="text-[8px] font-black text-foreground/40 uppercase mb-2 tracking-widest text-center">AI Recommendation Engine</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                   {availableTrees.map(t => (
+                     <div key={t} className={`px-2 py-1 rounded-md text-[8px] font-black uppercase border ${t === selectedTree ? 'bg-healthy/20 border-healthy text-healthy' : 'bg-white/5 border-white/10 text-white/40'}`}>
+                       {t}
+                     </div>
+                   ))}
+                </div>
+              </div>
+
               <InsightCard {...afforestIntel} />
             </motion.div>
           )}
