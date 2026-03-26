@@ -1,5 +1,5 @@
 // Types for Afforestation
-export type SoilType = "Coastal" | "Clay" | "Sandy";
+export type SoilType = "Coastal" | "Clay" | "Sandy" | "Red";
 export type WaterAvail = "Low" | "Medium" | "High";
 export type TreeType = "Neem" | "Banyan" | "Mangroves";
 
@@ -73,7 +73,7 @@ export function calculateEvTransition(evPercent: number, charging: ChargingDensi
 }
 
 // Types for Transit Flow
-export type CongestionZone = "T Nagar / Central" | "IT Corridor (OMR)" | "Suburbs";
+export type CongestionZone = "Core Commercial" | "Tech Corridor" | "Suburbs" | "Industrial Cluster";
 export type PublicTransport = "Poor" | "Moderate" | "Extensive";
 
 export function calculateTransitFlow(trafficReduction: number, zone: CongestionZone, transport: PublicTransport) {
@@ -81,14 +81,18 @@ export function calculateTransitFlow(trafficReduction: number, zone: CongestionZ
   let limitation = "";
   let recommendation = "";
 
-  if (zone === "T Nagar / Central" && transport !== "Extensive") {
+  if (zone === "Core Commercial" && transport !== "Extensive") {
     multiplier *= 0.4;
-    limitation = "Cannot reduce traffic in core commercial zones without extensive metro coverage.";
-    recommendation = "Boost metro connectivity before restricting vehicle routes.";
-  } else if (zone === "IT Corridor (OMR)") {
+    limitation = "Cannot reduce traffic in core commercial zones without extensive public transit coverage.";
+    recommendation = "Boost transit connectivity before restricting vehicle routes.";
+  } else if (zone === "Tech Corridor") {
     multiplier *= 1.4;
     limitation = "Heavy peak-hour directional flow.";
-    recommendation = "Signal optimization in IT Corridor yields exponential emission reductions.";
+    recommendation = "Signal optimization in tech corridors yields exponential emission reductions.";
+  } else if (zone === "Industrial Cluster") {
+    multiplier *= 0.7;
+    limitation = "Freight logistics heavily depend on road infrastructure.";
+    recommendation = "Incentivize off-peak freight scheduling locally.";
   } else {
     multiplier *= 1.0;
     limitation = "Standard dispersed flow.";

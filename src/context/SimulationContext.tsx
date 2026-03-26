@@ -7,6 +7,7 @@ import React, {
   ReactNode,
   useEffect,
 } from "react";
+import { tamilNaduRegions, TamilNaduRegion } from "@/data/tamilNaduRegions";
 
 interface SimulationContextProps {
   evAdoption: number;
@@ -18,6 +19,9 @@ interface SimulationContextProps {
   carbonCapture: number;
   setCarbonCapture: (val: number) => void;
   reductionPercentage: number;
+  selectedRegionId: string;
+  setSelectedRegionId: (id: string) => void;
+  selectedRegion: TamilNaduRegion;
 }
 
 const SimulationContext = createContext<SimulationContextProps | undefined>(
@@ -31,6 +35,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const [carbonCapture, setCarbonCapture] = useState(20);
 
   const [reductionPercentage, setReductionPercentage] = useState(0);
+  const [selectedRegionId, setSelectedRegionId] = useState<string>("chennai_coastal");
+
+  const selectedRegion = tamilNaduRegions.find(r => r.id === selectedRegionId) || tamilNaduRegions[0];
 
   // 🔥 BACKEND CALL
   const runSimulation = async () => {
@@ -85,6 +92,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         carbonCapture,
         setCarbonCapture,
         reductionPercentage,
+        selectedRegionId,
+        setSelectedRegionId,
+        selectedRegion,
       }}
     >
       {children}

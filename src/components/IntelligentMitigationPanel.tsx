@@ -8,12 +8,9 @@ import {
   calculateEvTransition,
   calculateTransitFlow,
   calculateDAC,
-  TreeType, SoilType, WaterAvail,
-  ChargingDensity, GridCapacity,
-  CongestionZone, PublicTransport,
-  CostBudget, EnergySource
+  TreeType
 } from "@/utils/mitigationIntelligence";
-import { Activity, Leaf, Car, Navigation, Factory, Zap, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Leaf, Car, Navigation, Factory, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 function InsightCard({ score, recommendation, limitation }: { score: string, recommendation: string, limitation: string }) {
   const getScoreColor = () => {
@@ -42,14 +39,23 @@ function InsightCard({ score, recommendation, limitation }: { score: string, rec
   );
 }
 
-function Dropdown({ label, value, options, onChange }: { label: string, value: string, options: string[], onChange: (v: any) => void }) {
+function RegionBadge({ label, value }: { label: string, value: string }) {
+  return (
+    <div className="flex-1 min-w-[120px] bg-white/5 border border-white/10 rounded-lg p-2">
+      <p className="text-[8px] tracking-widest uppercase font-black text-foreground/40 mb-1">{label}</p>
+      <p className="text-[10px] font-bold text-white uppercase">{value}</p>
+    </div>
+  );
+}
+
+function SelectDropdown({ label, value, options, onChange }: { label: string, value: string, options: string[], onChange: (v: any) => void }) {
   return (
     <div className="flex-1 min-w-[120px]">
-      <label className="text-[8px] tracking-widest uppercase font-black text-foreground/40 mb-1.5 block">{label}</label>
+      <label className="text-[8px] tracking-widest uppercase font-black text-foreground/40 mb-1 block">{label}</label>
       <select 
         value={value} 
         onChange={e => onChange(e.target.value)}
-        className="w-full bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold px-2 py-1.5 outline-none focus:border-healthy/50"
+        className="w-full bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold px-2 py-1.5 outline-none focus:border-healthy/50 text-healthy placeholder-white"
       >
         {options.map(o => <option key={o} value={o} className="bg-neutral-900 text-white">{o}</option>)}
       </select>
@@ -83,36 +89,28 @@ function Slider({ label, value, onChange, suffix }: { label: string; value: numb
 }
 
 export function IntelligentMitigationPanel() {
-  const { setTreesPlanted, setEvAdoption, setTrafficReduction, setCarbonCapture } = useSimulation();
+  const { 
+    setTreesPlanted, setEvAdoption, setTrafficReduction, setCarbonCapture,
+    selectedRegion 
+  } = useSimulation();
 
   const [activeTab, setActiveTab] = useState(0);
 
-  // 1. Afforestation
+  // Raw local slider states
   const [rawTrees, setRawTrees] = useState(55);
   const [treeType, setTreeType] = useState<TreeType>("Neem");
-  const [soilType, setSoilType] = useState<SoilType>("Clay");
-  const [waterAvail, setWaterAvail] = useState<WaterAvail>("Medium");
-  const afforestIntel = calculateAfforestation(rawTrees, treeType, soilType, waterAvail);
-
-  // 2. EV Transition
+  
   const [rawEv, setRawEv] = useState(40);
-  const [charging, setCharging] = useState<ChargingDensity>("Adequate");
-  const [grid, setGrid] = useState<GridCapacity>("Stable");
-  const evIntel = calculateEvTransition(rawEv, charging, grid);
-
-  // 3. Transit Flow
   const [rawTraffic, setRawTraffic] = useState(30);
-  const [zone, setZone] = useState<CongestionZone>("T Nagar / Central");
-  const [transport, setTransport] = useState<PublicTransport>("Moderate");
-  const transitIntel = calculateTransitFlow(rawTraffic, zone, transport);
-
-  // 4. DAC
   const [rawDac, setRawDac] = useState(20);
-  const [budget, setBudget] = useState<CostBudget>("Medium ($$)");
-  const [energy, setEnergy] = useState<EnergySource>("Mixed Grid");
-  const dacIntel = calculateDAC(rawDac, budget, energy);
 
-  // Effect Sync
+  // Dynamic Intelligence Lookups against region constants
+  // "treeType" remains selectable so the AI can grade if the user picks the wrong tree for the region!
+  const afforestIntel = calculateAfforestation(rawTrees, treeType, selectedRegion.soilType, selectedRegion.waterAvail);
+  const evIntel = calculateEvTransition(rawEv, selectedRegion.chargingDensity, selectedRegion.gridCapacity);
+  const transitIntel = calculateTransitFlow(rawTraffic, selectedRegion.congestionZone, selectedRegion.transitCoverage);
+  const dacIntel = calculateDAC(rawDac, selectedRegion.dacBudget, selectedRegion.energySource);
+
   useEffect(() => { setTreesPlanted(afforestIntel.effectiveTrees); }, [afforestIntel.effectiveTrees]);
   useEffect(() => { setEvAdoption(evIntel.effectiveEv); }, [evIntel.effectiveEv]);
   useEffect(() => { setTrafficReduction(transitIntel.effectiveTraffic); }, [transitIntel.effectiveTraffic]);
@@ -127,7 +125,6 @@ export function IntelligentMitigationPanel() {
 
   return (
     <div className="space-y-4">
-      {/* Tab Navigation */}
       <div className="flex gap-2">
         {tabs.map((t, i) => {
           const Icon = t.icon;
@@ -147,50 +144,49 @@ export function IntelligentMitigationPanel() {
         })}
       </div>
 
-      {/* Intelligence Cards */}
       <div className="bg-black/20 rounded-2xl p-4 border border-white/5 min-h-[300px]">
         <AnimatePresence mode="wait">
           
           {activeTab === 0 && (
-            <motion.div key="aff" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-5">
+            <motion.div key="aff" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-4">
               <Slider label="Tree Deployment Volume" value={rawTrees} onChange={setRawTrees} suffix="k units" />
-              <div className="flex flex-wrap gap-3">
-                <Dropdown label="Tree Genus" value={treeType} options={["Neem", "Banyan", "Mangroves"]} onChange={setTreeType} />
-                <Dropdown label="Soil Variant" value={soilType} options={["Coastal", "Clay", "Sandy"]} onChange={setSoilType} />
-                <Dropdown label="Water Saturation" value={waterAvail} options={["Low", "Medium", "High"]} onChange={setWaterAvail} />
+              <div className="flex flex-wrap gap-2">
+                <SelectDropdown label="Simulate Species" value={treeType} options={["Neem", "Banyan", "Mangroves"]} onChange={setTreeType} />
+                <RegionBadge label="Region Soil" value={selectedRegion.soilType} />
+                <RegionBadge label="Water Tracking" value={selectedRegion.waterAvail} />
               </div>
               <InsightCard {...afforestIntel} />
             </motion.div>
           )}
 
           {activeTab === 1 && (
-            <motion.div key="ev" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-5">
+            <motion.div key="ev" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-4">
                <Slider label="EV Transition Target" value={rawEv} onChange={setRawEv} suffix="%" />
-               <div className="flex flex-wrap gap-3">
-                 <Dropdown label="Charging Density" value={charging} options={["Poor", "Adequate", "Extensive"]} onChange={setCharging} />
-                 <Dropdown label="Grid Load Capacity" value={grid} options={["Strained", "Stable", "Surplus"]} onChange={setGrid} />
+               <div className="flex flex-wrap gap-2">
+                 <RegionBadge label="Infrastructure" value={selectedRegion.chargingDensity} />
+                 <RegionBadge label="Power Grid Matrix" value={selectedRegion.gridCapacity} />
                </div>
                <InsightCard {...evIntel} />
             </motion.div>
           )}
 
           {activeTab === 2 && (
-            <motion.div key="transit" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-5">
+            <motion.div key="transit" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-4">
                <Slider label="Traffic Optimization Matrix" value={rawTraffic} onChange={setRawTraffic} suffix="%" />
-               <div className="flex flex-wrap gap-3">
-                 <Dropdown label="Congestion Zone" value={zone} options={["T Nagar / Central", "IT Corridor (OMR)", "Suburbs"]} onChange={setZone} />
-                 <Dropdown label="Transit Coverage" value={transport} options={["Poor", "Moderate", "Extensive"]} onChange={setTransport} />
+               <div className="flex flex-wrap gap-2">
+                 <RegionBadge label="Core Logistics" value={selectedRegion.congestionZone} />
+                 <RegionBadge label="Public Transit Flow" value={selectedRegion.transitCoverage} />
                </div>
                <InsightCard {...transitIntel} />
             </motion.div>
           )}
 
           {activeTab === 3 && (
-            <motion.div key="dac" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-5">
+            <motion.div key="dac" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-4">
                <Slider label="Direct Air Capture Scale" value={rawDac} onChange={setRawDac} suffix="%" />
-               <div className="flex flex-wrap gap-3">
-                 <Dropdown label="Capital Budget" value={budget} options={["Low ($)", "Medium ($$)", "High ($$$)"]} onChange={setBudget} />
-                 <Dropdown label="Energy Source Matrix" value={energy} options={["Fossil Heavy", "Mixed Grid", "100% Renewable"]} onChange={setEnergy} />
+               <div className="flex flex-wrap gap-2">
+                 <RegionBadge label="Regional Budget" value={selectedRegion.dacBudget} />
+                 <RegionBadge label="Power Source Core" value={selectedRegion.energySource} />
                </div>
                <InsightCard {...dacIntel} />
             </motion.div>
@@ -198,7 +194,6 @@ export function IntelligentMitigationPanel() {
 
         </AnimatePresence>
       </div>
-
     </div>
   );
 }

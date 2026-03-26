@@ -1,200 +1,183 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip } from "react-leaflet";
-import { chennaiZones } from "@/data/chennaiZones";
-import { aqiToFactor } from "@/utils/aqiToCO2";
-import { Layers } from "lucide-react";
+import { useMemo } from "react";
+import { MapContainer, TileLayer, CircleMarker, Tooltip, Marker } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { tamilNaduGrid } from "@/data/tamilNaduGrid";
+import { windData } from "@/data/windData";
+import { Wind, Activity } from "lucide-react";
 
-// 🎯 Color based on CO₂ level
-const getColor = (level: string) => {
-  if (level === "high") return "#ef4444"; // 🔴 red
-  if (level === "medium") return "#f59e0b"; // 🟠 orange
-  return "#22c55e"; // 🟢 green
-};
-
-// 🎯 Recommendation logic
-const getRecommendation = (level: string) => {
-  if (level === "high") return "Carbon Capture + Traffic Control";
-  if (level === "medium") return "EV Adoption + Public Transport";
-  return "Maintain Green Zones";
-};
-
-type AqiNode = { lat: number; lng: number; aqi: number };
-type ViewMode = "co2" | "aqi" | "combined";
-
-const getNearestAqi = (lat: number, lng: number, aqiList: AqiNode[]) => {
-  if (!aqiList.length) return null;
-  return aqiList.reduce((prev, curr) => {
-    const prevDist = Math.hypot(prev.lat - lat, prev.lng - lng);
-    const currDist = Math.hypot(curr.lat - lat, curr.lng - lng);
-    return currDist < prevDist ? curr : prev;
+// Custom Arrow Icon for Wind
+const createWindIcon = (direction: number, speed: number) => {
+  return L.divIcon({
+    className: "custom-wind-icon",
+    html: `<div style="transform: rotate(${direction - 90}deg); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+             <svg viewBox="0 0 24 24" width="${12 + speed/2}" height="${12 + speed/2}" fill="none" stroke="#60a5fa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+               <line x1="12" y1="19" x2="12" y2="5"></line>
+               <polyline points="5 12 12 5 19 12"></polyline>
+             </svg>
+           </div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
   });
 };
 
-export function PollutionMap({ simulationResult }: { simulationResult?: { total: number; transport: number; reduction: number } }) {
-  const totalSafe = simulationResult?.total ?? 12.4;
-  const ratio = totalSafe / 12.4;
+const getIntensityColor = (intensity: number) => {
+  if (intensity < 60) return "#22c55e"; // Green
+  if (intensity < 100) return "#eab308"; // Yellow
+  if (intensity < 150) return "#ef4444"; // Red
+  return "#a855f7"; // Purple
+};
 
-  const [viewMode, setViewMode] = useState<ViewMode>("combined");
-  const [aqiData, setAqiData] = useState<AqiNode[]>([]);
+export function PollutionMap() {
+  const tnCenter: [number, number] = [11.1271, 78.6569];
+  const tnZoom = 7;
 
-  useEffect(() => {
-    fetch("/api/aqi")
-      .then((res) => res.json())
-      .then(setAqiData)
-      .catch(console.error);
-  }, []);
+  const memoizedGrid = useMemo(() => tamilNaduGrid.map(p => ({
+    ...p,
+    intensity: (p.co2 * 0.6) + (p.aqi * 0.4)
+  })), []);
 
   return (
-    <div className="h-72 w-full overflow-hidden rounded-xl border border-eco-primary/10 bg-white/60 shadow-inner relative">
-      
-      <div className="absolute top-4 right-4 z-[400] flex flex-col items-end gap-2">
-        <div className="flex bg-black/80 backdrop-blur-md p-1 rounded-lg border border-white/10 shadow-lg">
-          {(["co2", "combined", "aqi"] as ViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-md transition-all ${
-                viewMode === mode
-                  ? "bg-healthy text-black shadow-[0_0_15px_rgba(34,197,94,0.4)]"
-                  : "text-white/60 hover:text-white hover:bg-white/5"
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-
-        {viewMode === "combined" && (
-          <div className="bg-black/80 backdrop-blur-md p-3 rounded-lg border border-white/10 shadow-lg max-w-[200px]">
-            <p className="text-[9px] font-black text-white uppercase flex items-center gap-1.5 border-b border-white/10 pb-1.5 mb-1.5">
-              <Layers className="w-3 h-3 text-healthy" />
-              Hybrid Digital Twin
-            </p>
-            <p className="text-[10px] leading-relaxed text-white/80 font-medium">
-              <strong className="text-white">AQI</strong> is used as an environmental proxy to adjust <strong className="text-damage">CO₂</strong> intensity globally.
-            </p>
+    <div className="flex flex-col gap-12 w-full">
+      {/* 🔴 TOP SECTION: POLLUTION HEATMAP */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-healthy/10 rounded-lg border border-healthy/20">
+              <Activity className="w-5 h-5 text-healthy" />
+            </div>
+            <div>
+              <h3 className="text-scientific text-sm font-black text-foreground tracking-[0.15em] uppercase">CO₂ + AQI Heatmap (Tamil Nadu)</h3>
+              <p className="text-[9px] text-foreground/40 font-black uppercase tracking-tight">Combined carbon intensity & air quality index metrics.</p>
+            </div>
           </div>
-        )}
-      </div>
-
-      <MapContainer
-        center={[13.0827, 80.2707]} // 📍 Chennai
-        zoom={11}
-        scrollWheelZoom={false}
-        className="h-full w-full relative z-[1]"
-        style={{ backgroundColor: "#0a0a0a" }}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        />
-
-        {/* 🌫️ AQI Heatmap Layer */}
-        {(viewMode === "aqi" || viewMode === "combined") &&
-          aqiData.map((node, idx) => {
-            let color = "#eab308"; // moderate
-            if (node.aqi > 150) color = "#9333ea"; // severe/hazardous
-            else if (node.aqi > 100) color = "#ef4444"; // poor
-
-            return (
+        </div>
+        
+        <div className="relative h-[500px] w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl group/map">
+          <div className="absolute top-4 right-4 z-[1000] bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 opacity-0 group-hover/map:opacity-100 transition-opacity">
+            <span className="text-[9px] font-black uppercase text-white/60 tracking-widest">Digital Twin Sensor Grid v2.4</span>
+          </div>
+          
+          <MapContainer
+            center={tnCenter}
+            zoom={tnZoom}
+            scrollWheelZoom={false}
+            className="h-full w-full"
+            style={{ backgroundColor: "#0a0a0a" }}
+          >
+            <TileLayer
+              attribution='&copy; CARTO'
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            />
+            
+            {memoizedGrid.map((point, i) => (
               <CircleMarker
-                key={`aqi-${idx}`}
-                center={[node.lat, node.lng]}
-                radius={node.aqi / 2}
+                key={i}
+                center={[point.lat, point.lng]}
+                radius={20}
                 pathOptions={{
+                  fillColor: getIntensityColor(point.intensity),
+                  fillOpacity: 0.5,
                   color: "transparent",
-                  fillColor: color,
-                  fillOpacity: viewMode === "combined" ? 0.35 : 0.6,
-                  className: "pointer-events-none blur-[24px]", // reduced blur for higher contrast
-                }}
-              />
-            );
-          })}
-
-        {/* 🔥 Chennai CO₂ Zones Layer */}
-        {(viewMode === "co2" || viewMode === "combined") &&
-          chennaiZones.map((zone) => {
-            let simulatedEmission = zone.baseEmission * ratio;
-            if (zone.type === "industrial") simulatedEmission *= 1.3;
-            else if (zone.type === "commercial") simulatedEmission *= 1.1;
-            else if (zone.type === "residential") simulatedEmission *= 0.9;
-
-            // 🧠 Hybrid Integration
-            const nearestAqi = getNearestAqi(zone.lat, zone.lng, aqiData);
-            const aqiVal = nearestAqi?.aqi ?? 100; // safe fallback
-            const factor = viewMode === "combined" ? aqiToFactor(aqiVal) : 1; 
-            const finalEmission = simulatedEmission * factor;
-
-            let calculatedLevel = "low";
-            if (finalEmission > 130) calculatedLevel = "high";
-            else if (finalEmission > 80) calculatedLevel = "medium";
-
-            const zoneColor = getColor(calculatedLevel);
-            const radius = Math.max(5, finalEmission / 10);
-
-            return (
-              <CircleMarker
-                key={zone.name}
-                center={[zone.lat, zone.lng]}
-                radius={radius}
-                pathOptions={{
-                  color: zoneColor,
-                  fillColor: zoneColor,
-                  fillOpacity: 0.6,
-                  weight: 2,
-                  className: "animate-pulse transition-all duration-700",
+                  weight: 0
                 }}
               >
-                <Tooltip
-                  direction="top"
-                  offset={[0, -10]}
-                  opacity={0.9}
-                  className="!bg-white !text-[10px] !text-eco-primary !font-bold !border-eco-primary/10 !rounded-lg !shadow-xl !px-3 !py-1.5"
-                >
-                  {zone.name}
-                </Tooltip>
-
-                <Popup className="dashboard-popup">
-                  <div className="space-y-1.5 p-1 min-w-[200px]">
-                    <div className="flex justify-between items-end border-b border-eco-primary/15 pb-1">
-                      <p className="font-black text-sm text-eco-primary uppercase tracking-tight">
-                        {zone.name}
-                      </p>
-                      {viewMode === "combined" && (
-                        <p className="text-[9px] font-mono text-eco-primary/60 font-black">
-                          AQI: {aqiVal} (x{factor})
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="text-[11px] font-black text-eco-primary space-y-1 pt-1">
-                      <p className="flex justify-between">
-                        <span className="text-eco-primary/70">Risk Level:</span>
-                        <span className="font-mono uppercase">{calculatedLevel}</span>
-                      </p>
-
-                      <p className="flex justify-between">
-                        <span className="text-eco-primary/70">Emission Load:</span>
-                        <span className="font-mono uppercase">{finalEmission.toFixed(1)} Mt</span>
-                      </p>
-
-                      <p className="flex flex-col mt-2 pt-1 border-t border-eco-primary/15">
-                        <span className="text-eco-secondary text-[9px] uppercase tracking-widest font-black">
-                          Recommended Action
-                        </span>
-                        <span className="font-black text-eco-primary mt-0.5">
-                          {getRecommendation(calculatedLevel)}
-                        </span>
-                      </p>
+                <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                  <div className="bg-neutral-900 text-white p-2 rounded-lg border border-white/10">
+                    <p className="text-xs font-black uppercase mb-1">{point.name}</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-bold">
+                      <span className="text-white/40">CO₂:</span> <span>{point.co2} Mt</span>
+                      <span className="text-white/40">AQI:</span> <span>{point.aqi}</span>
+                      <span className="text-blue-400">WIND:</span> <span>~14 km/h</span>
+                      <span className="text-healthy font-black">INTENSITY:</span> <span className="text-healthy font-black">{point.intensity.toFixed(1)}</span>
                     </div>
                   </div>
-                </Popup>
+                </Tooltip>
               </CircleMarker>
-            );
-          })}
-      </MapContainer>
+            ))}
+          </MapContainer>
+        </div>
+      </div>
+
+      {/* 🔵 BOTTOM SECTION: WIND MAP */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+              <Wind className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-scientific text-sm font-black text-foreground tracking-[0.15em] uppercase">Wind Flow & Direction Map</h3>
+              <p className="text-[9px] text-foreground/40 font-black uppercase tracking-tight">Meso-scale atmospheric circulation vectors.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative h-[500px] w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl group/map">
+          <div className="absolute top-4 right-4 z-[1000] bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 opacity-0 group-hover/map:opacity-100 transition-opacity">
+            <span className="text-[9px] font-black uppercase text-white/60 tracking-widest">Atmospheric Flow Node v1.12</span>
+          </div>
+
+          <MapContainer
+            center={tnCenter}
+            zoom={tnZoom}
+            scrollWheelZoom={false}
+            className="h-full w-full"
+            style={{ backgroundColor: "#0a0a0a" }}
+          >
+            <TileLayer
+              attribution='&copy; CARTO'
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            />
+
+            {windData.map((w, i) => (
+              <Marker
+                key={i}
+                position={[w.lat, w.lng]}
+                icon={createWindIcon(w.direction, w.speed)}
+              >
+                <Tooltip direction="top" offset={[0, -10]}>
+                  <div className="bg-neutral-900 border border-white/10 p-2 text-white">
+                    <div className="text-[10px] font-black uppercase mb-1">Station Telemetry</div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-bold">
+                      <span className="text-white/40">SPEED:</span> <span>{w.speed} km/h</span>
+                      <span className="text-white/40">DIR:</span> <span>{w.direction}°</span>
+                      <span className="text-healthy">CO₂:</span> <span>~82.4 Mt</span>
+                    </div>
+                  </div>
+                </Tooltip>
+              </Marker>
+            ))}
+          </MapContainer>
+        </div>
+      </div>
+
+      {/* Legend Overlay */}
+      <div className="flex justify-center flex-wrap gap-8 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#22c55e]" />
+          <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Healthy</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#eab308]" />
+          <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Moderate</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
+          <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Hazardous</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-[#a855f7]" />
+          <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Critical</span>
+        </div>
+        <div className="h-4 w-px bg-white/10 mx-2" />
+        <div className="flex items-center gap-2">
+          <Wind className="w-4 h-4 text-blue-400" />
+          <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Wind Vector (Arrow)</span>
+        </div>
+      </div>
     </div>
   );
 }

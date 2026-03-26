@@ -6,6 +6,8 @@ import { PollutionHotspots } from "@/components/PollutionHotspots";
 import { EmissionForecast } from "@/components/EmissionForecast";
 import { ReductionMeter } from "@/components/ReductionMeter";
 import { IntelligentMitigationPanel } from "@/components/IntelligentMitigationPanel";
+import { IndustryRegulationPanel } from "@/components/IndustryRegulationPanel";
+import { tamilNaduRegions } from "@/data/tamilNaduRegions";
 import { cityEmissions, monthlyTrend } from "@/data/emissionsData";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -126,6 +128,8 @@ export default function DashboardPage() {
     carbonCapture,
     setCarbonCapture,
     reductionPercentage,
+    selectedRegionId,
+    setSelectedRegionId,
   } = useSimulation();
   const [activeSection, setActiveSection] = useState<ActiveView>("dashboard");
   const [results, setResults] = useState<SimulationResults | null>(null);
@@ -335,13 +339,12 @@ export default function DashboardPage() {
               {activeSection === "dashboard" && (
                 <section className="space-y-8">
                   <header>
-                    <div className="flex items-center gap-4">
-                      <div className="h-[2px] w-12 bg-healthy" />
+                    <div className="flex flex-col gap-1">
                       <h1 className="text-scientific text-5xl font-black tracking-[0.3em] text-foreground">
-                        Towards Net Zero
+                        ENVIRONMENTAL INTELLIGENCE
                       </h1>
+                      <p className="text-xs font-black text-healthy tracking-[0.4em] uppercase opacity-70">Statewide Monitoring System • Tamil Nadu</p>
                     </div>
-                    <h2 className="text-scientific text-lg font-black text-foreground/40 mt-1">for Our Planet</h2>
 
                     <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-end">
                       <p className="max-w-xl text-sm leading-relaxed text-foreground/60 font-bold uppercase tracking-tight">
@@ -431,7 +434,10 @@ export default function DashboardPage() {
                       </motion.section>
                     </div>
                     <div className="col-span-1">
-                      <PollutionHotspots simulationResult={simulationResult} />
+                      <PollutionHotspots />
+                    </div>
+                    <div className="col-span-1 lg:col-span-3">
+                      <IndustryRegulationPanel />
                     </div>
                     <div className="col-span-1 lg:col-span-3">
                       <EmissionForecast simulationResult={simulationResult} />
@@ -441,25 +447,8 @@ export default function DashboardPage() {
               )}
 
               {activeSection === "map" && (
-                <section className="glass-panel relative overflow-hidden rounded-2xl p-6 h-[500px]">
-                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-healthy/20 to-transparent" />
-                  <div className="flex h-full flex-col gap-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <h2 className="text-scientific text-[12px] font-black text-foreground tracking-[0.2em]">Regional Emission Heatmap</h2>
-                        <p className="text-[10px] text-foreground/40 font-black uppercase tracking-tight">Real-time localized satellite carbon assessment metrics.</p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {isSimulating && <span className="text-[10px] text-foreground/40 font-mono animate-pulse">Loading...</span>}
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10">
-                          <Map className="h-5 w-5 text-healthy" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="relative flex-1 rounded-xl overflow-hidden border border-white/5 bg-black/20">
-                      <PollutionMap simulationResult={simulationResult} />
-                    </div>
-                  </div>
+                <section className="space-y-6">
+                  <PollutionMap />
                 </section>
               )}
 

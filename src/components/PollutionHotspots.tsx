@@ -1,17 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { chennaiZones } from "@/data/chennaiZones";
+import { tamilNaduGrid } from "@/data/tamilNaduGrid";
 import { TrendingUp, TrendingDown, Minus, Activity } from "lucide-react";
 
-export function PollutionHotspots({ simulationResult }: { simulationResult?: { total: number; transport: number; reduction: number } }) {
-  const totalRatio = (simulationResult?.total ?? 12.4) / 12.4;
-
+export function PollutionHotspots() {
   const getRiskColor = (intensity: number) => {
     if (intensity < 60) return "text-healthy border-healthy/20 bg-healthy/5";
     if (intensity < 100) return "text-blue-400 border-blue-500/20 bg-blue-500/5";
     if (intensity < 140) return "text-damage/70 border-damage/20 bg-damage/5";
-    return "text-damage border-damage/40 bg-damage/10 shadow-[0_0_20px_rgba(239,68,68,0.1)]";
+    return "text-damage border-damage/40 bg-damage/10";
   };
 
   const getRiskLabel = (intensity: number) => {
@@ -21,22 +19,19 @@ export function PollutionHotspots({ simulationResult }: { simulationResult?: { t
     return "Critical";
   };
 
-  // Process data from chennai zones
-  const activeZones = chennaiZones.map((zone) => {
-    let emission = zone.baseEmission * totalRatio;
-    if (zone.type === "industrial") emission *= 1.3;
-    else if (zone.type === "commercial") emission *= 1.1;
-    else if (zone.type === "residential") emission *= 0.9;
+  // Process data from the statewide grid
+  const activeZones = tamilNaduGrid.map((point) => {
+    const intensity = (point.co2 * 0.6) + (point.aqi * 0.4);
     
     return {
-      id: zone.name,
-      name: zone.name,
-      intensity: Math.round(emission),
-      trend: totalRatio < 1 ? "decreasing" : totalRatio > 1 ? "increasing" : "stable",
+      id: point.name,
+      name: point.name,
+      intensity: Math.round(intensity),
+      trend: intensity > 120 ? "increasing" : intensity < 80 ? "decreasing" : "stable",
     };
   });
 
-  const topHotspots = activeZones.sort((a, b) => b.intensity - a.intensity).slice(0, 3);
+  const topHotspots = activeZones.sort((a, b) => b.intensity - a.intensity).slice(0, 5);
 
   return (
     <div className="glass-panel relative overflow-hidden rounded-2xl p-5 h-full">
@@ -47,7 +42,7 @@ export function PollutionHotspots({ simulationResult }: { simulationResult?: { t
             <Activity className="h-4 w-4 text-healthy" />
             Atmospheric Risk Index
           </h2>
-          <p className="text-[10px] text-foreground/40 font-black uppercase tracking-tight">Chennai zone CO₂ intensity via monitoring satellite.</p>
+          <p className="text-[10px] text-foreground/40 font-black uppercase tracking-tight">Tamil Nadu CO₂ intensity via monitoring satellite.</p>
         </div>
 
         <div className="space-y-3 mt-4">
