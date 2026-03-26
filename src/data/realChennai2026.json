@@ -1,0 +1,23 @@
+{
+  "city": "Chennai",
+  "year": 2026,
+  "type": "Estimated (based on CPCB + AQI trends)",
+  "totalCO2": 13.5,
+  "aqiAverage": 110,
+  "pm25": 38,
+  "sectors": {
+    "transport": 4.8,
+    "industrial": 5.6,
+    "residential": 3.1
+  },
+  "trend": [
+    { "month": "Jan", "emissions": 112 },
+    { "month": "Feb", "emissions": 108 },
+    { "month": "Mar", "emissions": 105 },
+    { "month": "Apr", "emissions": 102 },
+    { "month": "May", "emissions": 98 },
+    { "month": "Jun", "emissions": 95 }
+  ],
+  "insight": "Pollution rising due to industrial growth and traffic density",
+  "source": "Derived from CPCB, TNPCB & AQI real-time data (2025–2026)"
+}

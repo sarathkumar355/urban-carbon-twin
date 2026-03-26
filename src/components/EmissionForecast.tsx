@@ -1,10 +1,19 @@
 "use client";
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { emissionForecast } from "@/data/emissionsData";
 import { Sparkles, BarChart2 } from "lucide-react";
 
-export function EmissionForecast() {
+export function EmissionForecast({ simulationResult }: { simulationResult?: { total: number; transport: number; reduction: number } }) {
+  const currentTotal = simulationResult?.total ?? 12.4;
+  
+  // Predict next 5 years organically decreasing from current simulated total
+  const dynamicForecast = Array.from({ length: 5 }).map((_, i) => {
+    const year = 2025 + i;
+    // Assume a 5% organic reduction compound per year, starting from current simulated total
+    const predicted = currentTotal * Math.pow(0.95, i);
+    return { year: year.toString(), predicted: Number(predicted.toFixed(1)) };
+  });
+
   return (
     <div className="glass-panel relative overflow-hidden rounded-2xl p-6 h-full">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--healthy-primary),_transparent_75%)] opacity-[0.05]" />
@@ -26,7 +35,7 @@ export function EmissionForecast() {
 
         <div className="relative flex-1 min-h-[160px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={emissionForecast} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
+            <LineChart data={dynamicForecast} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis dataKey="year" stroke="rgba(255,255,255,0.3)" tickLine={false} tickMargin={12} tick={{ fontSize: 10, fontWeight: 800, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} />
               <YAxis stroke="rgba(255,255,255,0.3)" tickLine={false} tickMargin={12} tick={{ fontSize: 10, fontWeight: 800, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} />

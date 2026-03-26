@@ -5,6 +5,7 @@ import { StrategyComparison } from "@/components/StrategyComparison";
 import { PollutionHotspots } from "@/components/PollutionHotspots";
 import { EmissionForecast } from "@/components/EmissionForecast";
 import { ReductionMeter } from "@/components/ReductionMeter";
+import { IntelligentMitigationPanel } from "@/components/IntelligentMitigationPanel";
 import { cityEmissions, monthlyTrend } from "@/data/emissionsData";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -46,13 +47,6 @@ const PollutionMap = dynamic(
   () => import("../components/PollutionMap").then((m) => m.PollutionMap),
   { ssr: false }
 );
-
-const statCards = [
-  { label: "Total CO₂ Emissions", value: "12.4 Mt", change: "↓ 3.2% improving", trend: "down" },
-  { label: "Transport Emissions", value: `${cityEmissions.transport} Mt`, change: "Emission reduction trend", trend: "neutral" },
-  { label: "Industrial Emissions", value: `${cityEmissions.industrial} Mt`, change: "High intensity zone", trend: "up" },
-  { label: "Residential Emissions", value: "2.7 Mt", change: "↓ 1.4% reduction", trend: "down" },
-];
 
 const navItems = [
   { id: "dashboard", label: "Intelligence Center", icon: LayoutDashboard },
@@ -138,6 +132,12 @@ export default function DashboardPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<number>(0);
   const [direction, setDirection] = useState(1);
+  const [simulationResult, setSimulationResult] = useState({
+    total: 12.4,
+    transport: 4.1,
+    reduction: 0
+  });
+  const [isSimulating, setIsSimulating] = useState(false);
 
   const BASELINE_EMISSIONS = 12.4;
 
@@ -177,6 +177,93 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
+  const [emissionData, setEmissionData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const res = await fetch("/api/emissions");
+      const data = await res.json();
+      setEmissionData(data);
+    };
+
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (emissionData) {
+      console.log("DATA LOADED:", emissionData);
+    }
+  }, [emissionData]);
+  
+  useEffect(() => {
+    let active = true;
+    const fetchSimulation = async () => {
+      setIsSimulating(true);
+      try {
+        const res = await fetch("/api/simulation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trafficReduction,
+            treesPlanted,
+            evAdoption,
+            carbonCapture
+          })
+        });
+        if (!res.ok) throw new Error("Failed to fetch");
+        const data = await res.json();
+        if (active) {
+          setSimulationResult({
+            total: data?.total ?? 12.4,
+            transport: data?.transport ?? 4.1,
+            reduction: data?.reduction ?? 0
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setIsSimulating(false);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      fetchSimulation();
+    }, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [trafficReduction, treesPlanted, evAdoption, carbonCapture]);
+
+  const totalSafe = simulationResult?.total ?? 12.4;
+  const transportSafe = simulationResult?.transport ?? 4.1;
+  const industrialSafe = totalSafe * 0.45;
+  const residentialSafe = totalSafe * 0.22;
+
+  const percentChange = ((12.4 - totalSafe) / 12.4) * 100;
+  const isDown = percentChange >= 0;
+  const formattedChange = `${isDown ? "↓" : "↑"} ${Math.abs(percentChange).toFixed(1)}% ${isDown ? "reduction" : "increase"}`;
+  
+  const statCards = [
+    { label: "Total CO₂ Emissions", value: `${totalSafe.toFixed(1)} Mt`, change: formattedChange, trend: isDown ? "down" : "up" },
+    { label: "Transport Emissions", value: `${transportSafe.toFixed(1)} Mt`, change: `${transportSafe < 4.1 ? "↓" : "↑"} ${Math.abs(((4.1 - transportSafe) / 4.1) * 100).toFixed(1)}% vs baseline`, trend: transportSafe <= 4.1 ? "down" : "up" },
+    { label: "Industrial Emissions", value: `${industrialSafe.toFixed(1)} Mt`, change: `High intensity zone`, trend: industrialSafe <= (12.4 * 0.45) ? "down" : "up" },
+    { label: "Residential Emissions", value: `${residentialSafe.toFixed(1)} Mt`, change: `Monitored sector`, trend: residentialSafe <= (12.4 * 0.22) ? "down" : "up" },
+  ];
+
+  const estimatedNetZeroYear = Math.max(2025, Math.floor(2036 - (totalSafe - 12.4) * 2)) || 2036;
+
+  const cityEmissionsInfo = emissionData
+    ? emissionData.sectors
+    : { transport: 0, industrial: 0, residential: 0 };
+
+  const monthlyTrendData = emissionData
+    ? emissionData.trend.map((t: any) => ({
+        month: t.month,
+        emissions: t.emissions * (totalSafe / 12.4),
+      }))
+    : monthlyTrend;
   return (
     <main className="relative min-h-screen overflow-hidden bg-transparent px-4 py-6 text-eco-primary md:px-8 md:py-8">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
@@ -298,12 +385,12 @@ export default function DashboardPage() {
                         <p className="text-[10px] text-scientific text-eco-atmosphere font-bold">Carbon Neutrality Hub</p>
                         <div className="flex items-baseline gap-1">
                           <p className="text-2xl font-bold text-eco-primary tracking-tight">
-                            {Math.floor(2050 - reductionPercentage * 0.4)}
+                            {estimatedNetZeroYear}
                           </p>
                           <span className="text-[10px] text-eco-primary/40 font-mono font-bold">ESTIMATED</span>
                         </div>
                         <p className="text-[10px] text-eco-primary/60 leading-relaxed font-bold">
-                          Monitoring city footprint toward absolute net zero by {Math.floor(2050 - reductionPercentage * 0.4)}.
+                          Monitoring city footprint toward absolute net zero by {estimatedNetZeroYear}.
                         </p>
                       </div>
                     </motion.div>
@@ -315,7 +402,7 @@ export default function DashboardPage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.15, duration: 0.6 }}
-                        className="glass-panel relative h-full overflow-hidden rounded-2xl p-4"
+                        className="glass-panel relative overflow-hidden rounded-2xl p-4"
                       >
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--healthy-primary),_transparent_70%)] opacity-[0.05]" />
                         <div className="relative flex items-center justify-between pb-6">
@@ -324,27 +411,30 @@ export default function DashboardPage() {
                             <p className="text-[10px] text-foreground/40 font-black uppercase tracking-tight mt-1">Real-time emission synthesis · Global MtCO₂e</p>
                           </div>
                         </div>
-                        <div className="relative h-64 w-full">
+                        <div className="w-full h-[260px]">
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={monthlyTrend} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                              <XAxis dataKey="month" stroke="rgba(255,255,255,0.3)" tickLine={false} tickMargin={12} tick={{ fontSize: 10, fontWeight: 800, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} />
-                              <YAxis stroke="rgba(255,255,255,0.3)" tickLine={false} tickMargin={12} tick={{ fontSize: 10, fontWeight: 800, fill: 'rgba(255,255,255,0.4)', fontFamily: 'JetBrains Mono' }} />
-                              <Tooltip
-                                contentStyle={{ background: "#050a06", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}
-                                labelStyle={{ color: "white", fontWeight: "bold" }}
+                            <LineChart data={monthlyTrendData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                              <XAxis dataKey="month" stroke="rgba(255,255,255,0.3)" />
+                              <YAxis stroke="rgba(255,255,255,0.3)" />
+                              <Tooltip />
+
+                              <Line
+                                type="monotone"
+                                dataKey="emissions"
+                                stroke="#22c55e"
+                                strokeWidth={3}
                               />
-                              <Line type="monotone" dataKey="emissions" stroke="#22c55e" strokeWidth={4} dot={{ r: 4, fill: "#22c55e", strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} />
                             </LineChart>
                           </ResponsiveContainer>
-                        </div>
+                        </div>  
                       </motion.section>
                     </div>
                     <div className="col-span-1">
-                      <PollutionHotspots />
+                      <PollutionHotspots simulationResult={simulationResult} />
                     </div>
                     <div className="col-span-1 lg:col-span-3">
-                      <EmissionForecast />
+                      <EmissionForecast simulationResult={simulationResult} />
                     </div>
                   </div>
                 </section>
@@ -359,12 +449,15 @@ export default function DashboardPage() {
                         <h2 className="text-scientific text-[12px] font-black text-foreground tracking-[0.2em]">Regional Emission Heatmap</h2>
                         <p className="text-[10px] text-foreground/40 font-black uppercase tracking-tight">Real-time localized satellite carbon assessment metrics.</p>
                       </div>
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10">
-                        <Map className="h-5 w-5 text-healthy" />
+                      <div className="flex items-center gap-4">
+                        {isSimulating && <span className="text-[10px] text-foreground/40 font-mono animate-pulse">Loading...</span>}
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 border border-white/10">
+                          <Map className="h-5 w-5 text-healthy" />
+                        </div>
                       </div>
                     </div>
                     <div className="relative flex-1 rounded-xl overflow-hidden border border-white/5 bg-black/20">
-                      <PollutionMap />
+                      <PollutionMap simulationResult={simulationResult} />
                     </div>
                   </div>
                 </section>
@@ -379,15 +472,13 @@ export default function DashboardPage() {
                         <h2 className="text-scientific text-[11px] font-black text-eco-primary">Climate Mitigation Simulator</h2>
                         <p className="text-[10px] text-eco-primary font-black">AI-driven climate intelligence for predictive scenario modeling.</p>
                       </div>
-                      <div className="rounded-full border border-eco-primary/20 bg-eco-primary/5 px-3 py-1 text-[10px] font-bold text-eco-primary shadow-sm">
-                        PROJECTED: ~{(reductionPercentage * 1.2).toFixed(1)}% REDUCTION
+                      <div className="rounded-full border border-eco-primary/20 bg-eco-primary/5 px-3 py-1 text-[10px] font-bold text-eco-primary shadow-sm flex items-center gap-2">
+                        {isSimulating && <Activity className="w-3 h-3 animate-pulse" />}
+                        PROJECTED: ~{(simulationResult?.reduction ?? 0).toFixed(1)}% REDUCTION
                       </div>
                     </div>
-                    <div className="space-y-4 pt-2">
-                      <SimulationSlider label="EV Transition Rate" value={evAdoption} onChange={setEvAdoption} suffix="%" />
-                      <SimulationSlider label="Urban Afforestation" value={treesPlanted} onChange={setTreesPlanted} suffix="k" />
-                      <SimulationSlider label="Transit Flow Optimization" value={trafficReduction} onChange={setTrafficReduction} suffix="%" />
-                      <SimulationSlider label="Direct Air Capture" value={carbonCapture} onChange={setCarbonCapture} suffix="%" />
+                    <div className="pt-2">
+                      <IntelligentMitigationPanel />
                     </div>
 
                     <div className="pt-2">
@@ -408,9 +499,9 @@ export default function DashboardPage() {
               )}
 
               {activeSection === "results" && (
-                <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+                <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 min-h-[300px]">
                   <div className="col-span-full">
-                    <ReductionMeter percentage={currentResults.reductionPercent} />
+                    <ReductionMeter percentage={simulationResult?.reduction ?? currentResults.reductionPercent} />
                   </div>
 
                   <StrategyComparison />
@@ -418,7 +509,7 @@ export default function DashboardPage() {
                   <div className="glass-panel relative overflow-hidden rounded-2xl p-6">
                     <div className="relative space-y-4">
                       <h3 className="text-scientific text-[12px] font-black text-foreground tracking-[0.2em]">Baseline vs Scenario Differential</h3>
-                      <div className="h-44">
+                      <div className="w-full h-[260px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={barChartData} barSize={32}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />

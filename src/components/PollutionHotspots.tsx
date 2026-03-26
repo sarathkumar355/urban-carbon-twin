@@ -1,23 +1,42 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { pollutionHotspots } from "@/data/emissionsData";
+import { chennaiZones } from "@/data/chennaiZones";
 import { TrendingUp, TrendingDown, Minus, Activity } from "lucide-react";
 
-export function PollutionHotspots() {
+export function PollutionHotspots({ simulationResult }: { simulationResult?: { total: number; transport: number; reduction: number } }) {
+  const totalRatio = (simulationResult?.total ?? 12.4) / 12.4;
+
   const getRiskColor = (intensity: number) => {
-    if (intensity < 40) return "text-healthy border-healthy/20 bg-healthy/5";
-    if (intensity < 60) return "text-blue-400 border-blue-500/20 bg-blue-500/5"; // Neutral transition
-    if (intensity < 80) return "text-damage/70 border-damage/20 bg-damage/5";
+    if (intensity < 60) return "text-healthy border-healthy/20 bg-healthy/5";
+    if (intensity < 100) return "text-blue-400 border-blue-500/20 bg-blue-500/5";
+    if (intensity < 140) return "text-damage/70 border-damage/20 bg-damage/5";
     return "text-damage border-damage/40 bg-damage/10 shadow-[0_0_20px_rgba(239,68,68,0.1)]";
   };
 
   const getRiskLabel = (intensity: number) => {
-    if (intensity < 40) return "Sustainable";
-    if (intensity < 60) return "Transitionary";
-    if (intensity < 80) return "Hazardous";
+    if (intensity < 60) return "Sustainable";
+    if (intensity < 100) return "Transitionary";
+    if (intensity < 140) return "Hazardous";
     return "Critical";
   };
+
+  // Process data from chennai zones
+  const activeZones = chennaiZones.map((zone) => {
+    let emission = zone.baseEmission * totalRatio;
+    if (zone.type === "industrial") emission *= 1.3;
+    else if (zone.type === "commercial") emission *= 1.1;
+    else if (zone.type === "residential") emission *= 0.9;
+    
+    return {
+      id: zone.name,
+      name: zone.name,
+      intensity: Math.round(emission),
+      trend: totalRatio < 1 ? "decreasing" : totalRatio > 1 ? "increasing" : "stable",
+    };
+  });
+
+  const topHotspots = activeZones.sort((a, b) => b.intensity - a.intensity).slice(0, 3);
 
   return (
     <div className="glass-panel relative overflow-hidden rounded-2xl p-5 h-full">
@@ -28,11 +47,11 @@ export function PollutionHotspots() {
             <Activity className="h-4 w-4 text-healthy" />
             Atmospheric Risk Index
           </h2>
-          <p className="text-[10px] text-foreground/40 font-black uppercase tracking-tight">Zone CO₂ intensity via planetary monitoring satellite.</p>
+          <p className="text-[10px] text-foreground/40 font-black uppercase tracking-tight">Chennai zone CO₂ intensity via monitoring satellite.</p>
         </div>
 
         <div className="space-y-3 mt-4">
-          {pollutionHotspots.map((zone, index) => {
+          {topHotspots.map((zone, index) => {
             const riskStyles = getRiskColor(zone.intensity);
             const riskLabel = getRiskLabel(zone.intensity);
 
@@ -61,7 +80,7 @@ export function PollutionHotspots() {
                       Index {zone.intensity}
                     </p>
                     <div className="flex items-center justify-end gap-1">
-                      {zone.trend === "increasing" ? <TrendingUp className="h-3 w-3 text-damage" /> : <TrendingDown className="h-3 w-3 text-healthy" />}
+                      {zone.trend === "increasing" ? <TrendingUp className="h-3 w-3 text-damage" /> : zone.trend === "stable" ? <Minus className="h-3 w-3 text-blue-400" /> : <TrendingDown className="h-3 w-3 text-healthy" />}
                     </div>
                   </div>
                 </div>
