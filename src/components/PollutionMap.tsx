@@ -5,9 +5,12 @@ import { MapContainer, TileLayer, CircleMarker, Tooltip, Marker } from "react-le
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { tamilNaduGrid } from "@/data/tamilNaduGrid";
-import { Wind, Activity, MapPin } from "lucide-react";
+import { Wind, Activity, MapPin, AlertCircle, ShieldCheck } from "lucide-react";
 import { WindFlowLayer } from "./WindFlowLayer";
+import { HighDensityWindLayer } from "./HighDensityWindLayer";
 import { motion, AnimatePresence } from "framer-motion";
+import { calculateCompliance, getStatusColor } from "@/utils/complianceLogic";
+import { useSimulation } from "@/context/SimulationContext";
 
 type WindPoint = {
   name: string;
@@ -89,10 +92,18 @@ export function PollutionMap() {
     return () => clearInterval(interval);
   }, []);
 
-  const memoizedGrid = useMemo(() => tamilNaduGrid.map(p => ({
-    ...p,
-    intensity: (p.co2 * 0.6) + (p.aqi * 0.4)
-  })), []);
+  const { reductionPercentage } = useSimulation();
+
+  const memoizedGrid = useMemo(() => tamilNaduGrid.map(p => {
+    const currentPollution = p.co2 * (1 - reductionPercentage / 100);
+    const compliance = calculateCompliance(p.name, currentPollution, p.regulatoryLimit);
+    return {
+      ...p,
+      currentCo2: currentPollution,
+      intensity: (currentPollution * 0.6) + (p.aqi * 0.4),
+      compliance
+    };
+  }), [reductionPercentage]);
 
   const UserMarker = ({ pos, env }: { pos: { lat: number; lng: number }, env: UserEnv | null }) => {
     const color = env ? getZoneColor(env.zone) : "#3b82f6";
@@ -169,16 +180,47 @@ export function PollutionMap() {
                 key={i}
                 center={[point.lat, point.lng]}
                 radius={20}
-                pathOptions={{ fillColor: getIntensityColor(point.intensity), fillOpacity: 0.5, color: "transparent", weight: 0 }}
+                pathOptions={{ 
+                  fillColor: getIntensityColor(point.intensity), 
+                  fillOpacity: point.compliance.violation ? 0.7 : 0.5, 
+                  color: point.compliance.violation ? "#ef4444" : "transparent", 
+                  weight: point.compliance.violation ? 2 : 0,
+                  dashArray: point.compliance.violation ? "5, 5" : undefined
+                }}
               >
                 <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-                  <div className="bg-neutral-900 text-white p-2 rounded-lg border border-white/10">
-                    <p className="text-xs font-black uppercase mb-1">{point.name}</p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-bold text-white/90">
-                      <span className="text-white/40">CO₂:</span> <span>{point.co2} Mt</span>
-                      <span className="text-white/40">AQI:</span> <span>{point.aqi}</span>
-                      <span className="text-healthy font-black">INTENSITY:</span> <span className="text-healthy font-black">{point.intensity.toFixed(1)}</span>
+                  <div className="bg-neutral-900 text-white p-3 rounded-xl border border-white/10 min-w-[200px] shadow-2xl">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-xs font-black uppercase">{point.name}</p>
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded border uppercase" style={{ color: getStatusColor(point.compliance.status), borderColor: getStatusColor(point.compliance.status) }}>
+                        {point.compliance.status}
+                      </span>
                     </div>
+                    
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-white/40 uppercase">Current CO₂:</span>
+                        <span className="text-white">{point.currentCo2.toFixed(1)} Mt</span>
+                      </div>
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-white/40 uppercase">Reg. Limit:</span>
+                        <span className="text-white/60">{point.regulatoryLimit} Mt</span>
+                      </div>
+                    </div>
+
+                    {point.compliance.violation && (
+                      <div className="mt-3 pt-2 border-t border-white/5 flex items-center gap-2 text-damage animate-pulse">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <p className="text-[9px] font-black uppercase">Violation: {point.compliance.excessPollution} Mt Excess</p>
+                      </div>
+                    )}
+
+                    {!point.compliance.violation && (
+                      <div className="mt-3 pt-2 border-t border-white/5 flex items-center gap-2 text-healthy">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <p className="text-[9px] font-black uppercase">Regulatory Compliant</p>
+                      </div>
+                    )}
                   </div>
                 </Tooltip>
               </CircleMarker>
@@ -211,7 +253,7 @@ export function PollutionMap() {
           <MapContainer center={tnCenter} zoom={tnZoom} scrollWheelZoom={false} className="h-full w-full" style={{ backgroundColor: "#0a0a0a" }}>
             <TileLayer attribution='&copy; CARTO' url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
             
-            {windData.length > 0 && <WindFlowLayer data={windData} />}
+            {windData.length > 0 && <HighDensityWindLayer data={windData} />}
             {userLocation && <UserMarker pos={userLocation} env={userEnv} />}
           </MapContainer>
 
@@ -249,14 +291,36 @@ export function PollutionMap() {
           <div className="w-3 h-3 rounded-full bg-[#ef4444]" />
           <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">High Risk</span>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full border-2 border-damage bg-damage/30 animate-pulse" />
+          <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Regulatory Violation</span>
+        </div>
         <div className="h-4 w-px bg-white/10 mx-2" />
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white animate-pulse" />
           <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">User Position</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-[2px] bg-blue-400 opacity-60" />
-          <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Wind Streamline</span>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+             <svg width="18" height="12" viewBox="0 0 24 16" fill="none" className="text-blue-400">
+               <path d="M0 8H20M20 8L14 2M20 8L14 14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+             </svg>
+             <span className="text-[10px] font-black uppercase text-white/40 tracking-wider">Meteorological Isobar Flow</span>
+          </div>
+          <div className="flex items-center gap-4 pl-6">
+             <div className="flex items-center gap-1.5">
+               <div className="w-2 h-2 rounded-full bg-[#22d3ee]" />
+               <span className="text-[8px] font-black text-white/30 uppercase">Light</span>
+             </div>
+             <div className="flex items-center gap-1.5">
+               <div className="w-2 h-2 rounded-full bg-[#3b82f6]" />
+               <span className="text-[8px] font-black text-white/30 uppercase">Moderate</span>
+             </div>
+             <div className="flex items-center gap-1.5">
+               <div className="w-2 h-2 rounded-full bg-[#a855f7]" />
+               <span className="text-[8px] font-black text-white/30 uppercase">Extreme</span>
+             </div>
+          </div>
         </div>
       </div>
     </div>

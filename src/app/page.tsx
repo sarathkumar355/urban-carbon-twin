@@ -10,6 +10,7 @@ import { IndustryRegulationPanel } from "@/components/IndustryRegulationPanel";
 import { PolicyImpactChart } from "@/components/PolicyImpactChart";
 import { CarbonBudgetTracker } from "@/components/CarbonBudgetTracker";
 import Chatbot from "@/components/Chatbot";
+import { CompliancePanel } from "@/components/CompliancePanel";
 import { emissionsHistory } from "@/data/emissionsHistory";
 import { CLAMP_LIMITS } from "@/data/simulationConstants";
 import { AnimatePresence, motion } from "framer-motion";
@@ -40,6 +41,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
+
 
 type SimulationResults = {
   reductionPercent: number;
@@ -90,7 +92,8 @@ function StatCard({ label, value, change, index, trend }: { label: string; value
 const liveMessages = [
   "Atmospheric streamline sync: Active",
   "Policy effectiveness grading complete: A (Combined)",
-  "Sector carbon monitoring: Industrial cluster High",
+  "VIOLATION: Manali Petrochem exceeds regulatory limit",
+  "CRITICAL: Ennore Industrial cluster breaching safe bounds",
   "Planetary boundary check: 18.4% remaining",
   "Urban canopy intelligence: Best match (Neem) identified",
 ];
@@ -98,12 +101,16 @@ const liveMessages = [
 export default function DashboardPage() {
   const {
     evAdoption,
+    setEvAdoption,
     treesPlanted,
+    setTreesPlanted,
     trafficReduction,
+    setTrafficReduction,
     carbonCapture,
+    setCarbonCapture,
     reductionPercentage,
   } = useSimulation();
-  
+
   const [activeSection, setActiveSection] = useState<ActiveView>("dashboard");
   const [results, setResults] = useState<SimulationResults | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -145,7 +152,7 @@ export default function DashboardPage() {
     }, 3000);
     return () => clearInterval(interval);
   }, []);
-  
+
   useEffect(() => {
     let active = true;
     const fetchSimulation = async () => {
@@ -194,7 +201,7 @@ export default function DashboardPage() {
   const percentChange = ((12.4 - totalSafe) / 12.4) * 100;
   const isDown = percentChange >= 0;
   const formattedChange = `${isDown ? "↓" : "↑"} ${Math.abs(percentChange).toFixed(1)}% ${isDown ? "reduction" : "increase"}`;
-  
+
   const statCards = [
     { label: "Total CO₂ Emissions", value: `${totalSafe.toFixed(1)} Mt`, change: formattedChange, trend: isDown ? "down" : "up" },
     { label: "Transport Sector", value: `${transportSafe.toFixed(1)} Mt`, change: `${transportSafe < 4.1 ? "↓" : "↑"} ${Math.abs(((4.1 - transportSafe) / 4.1) * 100).toFixed(1)}% vs base`, trend: transportSafe <= 4.1 ? "down" : "up" },
@@ -212,13 +219,13 @@ export default function DashboardPage() {
           className="glass-panel sticky top-6 hidden h-[calc(100vh-3rem)] w-60 shrink-0 flex-col rounded-3xl p-5 md:flex"
         >
           <div className="mb-8 flex items-center gap-3">
-             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-healthy via-blue-500 to-eco-accent shadow-xl">
-               <BrainCircuit className="h-6 w-6 text-white" />
-             </div>
-             <div>
-               <p className="text-xs font-black tracking-widest text-foreground uppercase">CarbonAI</p>
-               <p className="text-[9px] text-healthy font-black opacity-60 tracking-wider">Planetary Twin v3.0</p>
-             </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-healthy via-blue-500 to-eco-accent shadow-xl">
+              <BrainCircuit className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <p className="text-xs font-black tracking-widest text-foreground uppercase">CarbonAI</p>
+              <p className="text-[9px] text-healthy font-black opacity-60 tracking-wider">Planetary Twin v3.0</p>
+            </div>
           </div>
 
           <nav className="flex flex-1 flex-col gap-1.5">
@@ -268,10 +275,10 @@ export default function DashboardPage() {
                 <div className="space-y-8 pb-12">
                   <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                     <div>
-                      <h1 className="text-scientific text-6xl font-black tracking-[0.2em] text-foreground uppercase leading-tight">Climate<br/>Intelligence</h1>
+                      <h1 className="text-scientific text-6xl font-black tracking-[0.2em] text-foreground uppercase leading-tight">Environmental<br />Intelligence</h1>
                       <div className="flex items-center gap-3 mt-4">
-                         <span className="px-3 py-1 bg-healthy/20 border border-healthy/30 text-healthy text-[9px] font-black tracking-[0.3em] rounded-full uppercase">Tamil Nadu Monitor</span>
-                         <span className="text-[10px] font-black text-foreground/30 uppercase tracking-widest">Global Emissions Inventory v2025.1</span>
+                        <span className="px-3 py-1 bg-healthy/20 border border-healthy/30 text-healthy text-[9px] font-black tracking-[0.3em] rounded-full uppercase">Tamil Nadu Monitor</span>
+                        <span className="text-[10px] font-black text-foreground/30 uppercase tracking-widest">Global Emissions Inventory v2025.1</span>
                       </div>
                     </div>
 
@@ -281,10 +288,10 @@ export default function DashboardPage() {
                       </div>
                       <div className="w-48 overflow-hidden h-4 relative">
                         <AnimatePresence mode="wait">
-                          <motion.p 
-                            key={messageIndex} 
-                            initial={{ y: 20, opacity: 0 }} 
-                            animate={{ y: 0, opacity: 1 }} 
+                          <motion.p
+                            key={messageIndex}
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
                             exit={{ y: -20, opacity: 0 }}
                             className="absolute inset-0 text-[10px] font-black uppercase tracking-widest text-foreground/60"
                           >
@@ -312,15 +319,15 @@ export default function DashboardPage() {
                               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                               <XAxis dataKey="year" stroke="#ffffff30" fontSize={10} tick={{ fontWeight: 'black' }} />
                               <YAxis stroke="#ffffff30" fontSize={10} domain={['dataMin - 1000', 'dataMax + 1000']} />
-                              <Tooltip 
+                              <Tooltip
                                 contentStyle={{ backgroundColor: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", fontSize: "10px" }}
                                 filterNull={false}
                               />
-                              <Line 
-                                type="monotone" 
-                                dataKey="value" 
-                                stroke="#22c55e" 
-                                strokeWidth={4} 
+                              <Line
+                                type="monotone"
+                                dataKey="value"
+                                stroke="#22c55e"
+                                strokeWidth={4}
                                 dot={{ fill: '#22c55e', r: 3 }}
                                 activeDot={{ r: 6, fill: 'white' }}
                               />
@@ -328,7 +335,7 @@ export default function DashboardPage() {
                           </ResponsiveContainer>
                         </div>
                       </div>
-                      
+
                       <PolicyImpactChart />
                     </div>
 
@@ -336,11 +343,11 @@ export default function DashboardPage() {
                       <PollutionHotspots />
                       <div className="glass-panel p-6 rounded-[2rem] bg-gradient-to-br from-blue-500/10 to-eco-accent/5 border border-white/5">
                         <div className="flex items-center gap-2 mb-4">
-                           <BrainCircuit className="w-5 h-5 text-blue-400" />
-                           <h3 className="text-[11px] font-black uppercase tracking-widest">AI Strategic Insight</h3>
+                          <BrainCircuit className="w-5 h-5 text-blue-400" />
+                          <h3 className="text-[11px] font-black uppercase tracking-widest">AI Strategic Insight</h3>
                         </div>
                         <p className="text-xs font-bold leading-relaxed text-foreground/70 uppercase tracking-tight italic">
-                           "Current simulation data reveals that combined Fleet Electrification and Industrial Point Capture provides a 3.2x faster path to Net Zero than afforestation alone in Tamil Nadu hubs."
+                          "Current simulation data reveals that combined Fleet Electrification and Industrial Point Capture provides a 3.2x faster path to Net Zero than afforestation alone in Tamil Nadu hubs."
                         </p>
                       </div>
                     </div>
@@ -348,7 +355,10 @@ export default function DashboardPage() {
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <IndustryRegulationPanel />
-                    <EmissionForecast simulationResult={simulationResult} />
+                    <CompliancePanel globalReduction={reductionPercentage} />
+                    <div className="md:col-span-2">
+                      <EmissionForecast simulationResult={simulationResult} />
+                    </div>
                   </div>
                 </div>
               )}
@@ -357,47 +367,47 @@ export default function DashboardPage() {
 
               {activeSection === "simulation" && (
                 <div className="glass-panel relative overflow-hidden rounded-[2.5rem] p-10 border border-white/10">
-                   <div className="absolute top-0 right-0 -m-12 h-64 w-64 rounded-full bg-healthy/10 blur-[100px]" />
-                   <div className="relative">
-                     <div className="flex items-center justify-between gap-4 mb-8">
-                        <div>
-                          <h2 className="text-scientific text-3xl font-black text-foreground tracking-[0.1em] uppercase">Policy Simulator</h2>
-                          <p className="text-[10px] text-foreground/40 font-black uppercase tracking-[0.2em] mt-2">Adjust climate levers to project atmospheric outcomes.</p>
-                        </div>
-                        <div className="px-6 py-3 bg-healthy/10 border border-healthy/20 rounded-2xl">
-                          <p className="text-[9px] font-black text-healthy uppercase tracking-widest mb-1">Projected reduction</p>
-                          <p className="text-3xl font-black text-foreground">{simulationResult.reduction.toFixed(1)}%</p>
-                        </div>
-                     </div>
-                     <IntelligentMitigationPanel />
-                     <motion.button
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                        onClick={() => { setIsWizardOpen(true); setWizardStep(0); }}
-                        className="mt-8 w-full py-5 bg-foreground text-background text-[11px] font-black uppercase tracking-[0.4em] rounded-2xl shadow-2xl transition-all"
-                      >
-                        Enter Planetary Scenario Wizard
-                      </motion.button>
-                   </div>
+                  <div className="absolute top-0 right-0 -m-12 h-64 w-64 rounded-full bg-healthy/10 blur-[100px]" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between gap-4 mb-8">
+                      <div>
+                        <h2 className="text-scientific text-3xl font-black text-foreground tracking-[0.1em] uppercase">Policy Simulator</h2>
+                        <p className="text-[10px] text-foreground/40 font-black uppercase tracking-[0.2em] mt-2">Adjust climate levers to project atmospheric outcomes.</p>
+                      </div>
+                      <div className="px-6 py-3 bg-healthy/10 border border-healthy/20 rounded-2xl">
+                        <p className="text-[9px] font-black text-healthy uppercase tracking-widest mb-1">Projected reduction</p>
+                        <p className="text-3xl font-black text-foreground">{simulationResult.reduction.toFixed(1)}%</p>
+                      </div>
+                    </div>
+                    <IntelligentMitigationPanel />
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      onClick={() => { setIsWizardOpen(true); setWizardStep(0); }}
+                      className="mt-8 w-full py-5 bg-foreground text-background text-[11px] font-black uppercase tracking-[0.4em] rounded-2xl shadow-2xl transition-all"
+                    >
+                      Enter Planetary Scenario Wizard
+                    </motion.button>
+                  </div>
                 </div>
               )}
 
               {activeSection === "results" && (
                 <div className="grid gap-6">
-                   <ReductionMeter percentage={simulationResult.reduction} />
-                   <div className="grid gap-6 md:grid-cols-2">
-                      <StrategyComparison />
-                      <div className="glass-panel p-8 rounded-[2.5rem] border border-white/10 flex flex-col justify-center text-center space-y-4">
-                         <h3 className="text-[10px] font-black uppercase text-foreground/40 tracking-[0.3em]">Planetary Path Synthesis</h3>
-                         <div className="py-6">
-                            <p className="text-6xl font-black text-foreground">{currentResults.after.toFixed(1)} <span className="text-xl text-foreground/40">Mt</span></p>
-                            <p className="text-[9px] font-black text-healthy uppercase tracking-widest mt-2">Simulated Emission Future</p>
-                         </div>
-                         <p className="text-xs font-bold leading-relaxed text-foreground/60 uppercase">
-                            Your configured strategies avoid approximately {(12.4 - currentResults.after).toFixed(1)} million metric tons of carbon yearly.
-                         </p>
+                  <ReductionMeter percentage={simulationResult.reduction} />
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <StrategyComparison />
+                    <div className="glass-panel p-8 rounded-[2.5rem] border border-white/10 flex flex-col justify-center text-center space-y-4">
+                      <h3 className="text-[10px] font-black uppercase text-foreground/40 tracking-[0.3em]">Planetary Path Synthesis</h3>
+                      <div className="py-6">
+                        <p className="text-6xl font-black text-foreground">{currentResults.after.toFixed(1)} <span className="text-xl text-foreground/40">Mt</span></p>
+                        <p className="text-[9px] font-black text-healthy uppercase tracking-widest mt-2">Simulated Emission Future</p>
                       </div>
-                   </div>
+                      <p className="text-xs font-bold leading-relaxed text-foreground/60 uppercase">
+                        Your configured strategies avoid approximately {(12.4 - currentResults.after).toFixed(1)} million metric tons of carbon yearly.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -405,16 +415,16 @@ export default function DashboardPage() {
                 <div className="glass-panel h-[720px] rounded-[2.5rem] overflow-hidden border border-white/10 relative">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50" />
                   <div className="p-8 border-b border-white/5 bg-white/5 flex items-center justify-between">
-                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
-                          <BrainCircuit size={20} className="text-blue-400" />
-                        </div>
-                        <div>
-                          <h2 className="text-scientific text-[14px] font-black text-foreground tracking-[0.1em] uppercase">Climate Strategy Assistant</h2>
-                          <p className="text-[9px] text-healthy font-black uppercase tracking-[0.2em] animate-pulse">Neural Core Online</p>
-                        </div>
-                     </div>
-                     <span className="text-[9px] font-black px-3 py-1 bg-white/5 rounded-full border border-white/10 text-white/40 uppercase tracking-widest">Model: Llama 3 - 70B</span>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
+                        <BrainCircuit size={20} className="text-blue-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-scientific text-[14px] font-black text-foreground tracking-[0.1em] uppercase">Climate Strategy Assistant</h2>
+                        <p className="text-[9px] text-healthy font-black uppercase tracking-[0.2em] animate-pulse">Neural Core Online</p>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black px-3 py-1 bg-white/5 rounded-full border border-white/10 text-white/40 uppercase tracking-widest">Model: Llama 3 - 70B</span>
                   </div>
                   <div className="h-full">
                     <Chatbot />
@@ -453,8 +463,8 @@ export default function DashboardPage() {
                           <p className="text-sm text-foreground/40 font-bold leading-relaxed uppercase">Mapping electrification vectors for urban transport hubs.</p>
                         </div>
                         <div className="py-10 bg-white/5 rounded-3xl px-10 border border-white/10 shadow-inner">
-                           <div className="flex justify-between text-[11px] font-black mb-4"><span className="text-foreground/40">TARGET ADOPTION</span> <span className="text-healthy">{evAdoption}%</span></div>
-                           <input type="range" min="0" max="100" value={evAdoption} onChange={(e) => setEvAdoption(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none bg-white/10 accent-healthy cursor-pointer" />
+                          <div className="flex justify-between text-[11px] font-black mb-4"><span className="text-foreground/40">TARGET ADOPTION</span> <span className="text-healthy">{evAdoption}%</span></div>
+                          <input type="range" min="0" max="100" value={evAdoption} onChange={(e) => setEvAdoption(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none bg-white/10 accent-healthy cursor-pointer" />
                         </div>
                       </div>
                     )}
@@ -475,13 +485,13 @@ export default function DashboardPage() {
                     {/* Simplified other steps to save space, keeping logic */}
                     {[1, 2, 3].includes(wizardStep) && (
                       <div className="text-center space-y-8">
-                         <h3 className="text-4xl font-black uppercase text-foreground">Phase Integration {wizardStep + 1}</h3>
-                         <p className="text-xs text-foreground/40 font-bold uppercase">Adjusting complex mitigation coefficients...</p>
-                         <div className="max-w-md mx-auto py-8 px-10 bg-white/5 border border-white/10 rounded-2xl">
-                            {wizardStep === 1 && <input type="range" value={treesPlanted} onChange={e => setTreesPlanted(Number(e.target.value))} className="w-full" />}
-                            {wizardStep === 2 && <input type="range" value={trafficReduction} onChange={e => setTrafficReduction(Number(e.target.value))} className="w-full" />}
-                            {wizardStep === 3 && <input type="range" value={carbonCapture} onChange={e => setCarbonCapture(Number(e.target.value))} className="w-full" />}
-                         </div>
+                        <h3 className="text-4xl font-black uppercase text-foreground">Phase Integration {wizardStep + 1}</h3>
+                        <p className="text-xs text-foreground/40 font-bold uppercase">Adjusting complex mitigation coefficients...</p>
+                        <div className="max-w-md mx-auto py-8 px-10 bg-white/5 border border-white/10 rounded-2xl">
+                          {wizardStep === 1 && <input type="range" value={treesPlanted} onChange={e => setTreesPlanted(Number(e.target.value))} className="w-full" />}
+                          {wizardStep === 2 && <input type="range" value={trafficReduction} onChange={e => setTrafficReduction(Number(e.target.value))} className="w-full" />}
+                          {wizardStep === 3 && <input type="range" value={carbonCapture} onChange={e => setCarbonCapture(Number(e.target.value))} className="w-full" />}
+                        </div>
                       </div>
                     )}
                   </motion.div>
